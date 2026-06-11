@@ -81,8 +81,21 @@ int main()
             putstrUSART1(storedInput.data);
             putchUSART1('\n');
 
-            sprintf(buffer, "%s", storedInput.data);
-            SendStrActualXY(buffer, 0, 0);
+            sprintf(buffer, "PkLn: %2d", storedInput.packetLength);
+            SendStrActualXY(buffer, 0, 1);
+            sprintf(buffer, "type: %2d", storedInput.type);
+            SendStrActualXY(buffer, 0, 2);
+            SendStrActualXY("data:", 0, 3);
+
+            for (int k = 0; k < storedInput.packetLength - 7; k++)
+            {
+                char hexBuf[8];
+                sprintf(hexBuf, "%02X ", storedInput.data[k]);
+                SendStrActualXY(hexBuf, k * 2 + 6, 3);
+            }
+            sprintf(buffer, "crc:  %2x", storedInput.crc);
+            SendStrActualXY(buffer, 0, 4);
+
         }
     }
 }
@@ -97,34 +110,32 @@ ISR(USART1_RX_vect)
 
     inputBytes[i++] = received;
 
-    char debugBuf[12];
-    sprintf(debugBuf, "%hx", i);
-    putstrUSART1(debugBuf);
-    putstrUSART0(debugBuf);
-    SendStrActualXY(debugBuf, 0, 3);
-    
+    // char debugBuf[12];
+    // sprintf(debugBuf, "%d", i);
+    // SendStrActualXY(debugBuf, 0, 3);
 
-    // check if we received start bytes
-    if (i <= 2)
+    //     // check if we received start bytes
+    if (i == 1)
     {
         if (inputBytes[0] != 0x55)
         {
             i = 0;
             return;
         }
+    }
+    if (i == 2)
         if (inputBytes[1] != 0xAA)
         {
             i = 0;
             return;
         }
-    }
 
     // get length bytes and type
     if (i <= 5)
         return;
 
     // get data
-    if (i < (int)((inputBytes[2] << 8) | inputBytes[3]))
+    if (i < (int)((inputBytes[2] << 8) | inputBytes[3]) - 1)
         return;
 
     // check parity
