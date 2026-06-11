@@ -8,6 +8,7 @@
 #include <avr/interrupt.h>
 #include "timer.h"
 #include "usart.h"
+#include "functions.h"
 
 #define BAUD 115200
 #define MY_UBRRD F_CPU / 8 / BAUD - 1  // double speed
@@ -19,12 +20,12 @@ volatile int receiveFlag = 0;
 volatile char byte = 0;
 uint8_t inputBytes[MaxInputLength];
 
-// define packet struct
 typedef struct
 {
     uint16_t packetLength;
     uint8_t type;
-    uint8_t data[MaxInputLength - 7]; // adjust size based on max payload
+    uint16_t dataLength;
+    uint8_t data[MaxInputLength - 7];
     uint16_t crc;
 } Packet;
 
@@ -38,17 +39,6 @@ volatile Packet storedInput = {0};
         PORT##E |= (1 << PE##nr);     \
         EIMSK |= (1 << INT##nr);      \
     } while (0)
-
-/**
- * @brief sends a string using sendStrXY, but with fixed XY coordianates
- * @param _string the string
- * @param _x x coordiante
- * @param _y y coordinate
- */
-void SendStrActualXY(char *_string, int _x, int _y)
-{
-    sendStrXY(_string, _y, _x);
-}
 
 /**
  * @brief prints the packet info to the OLED
@@ -83,7 +73,6 @@ void PrintPackageToDisplay(Packet pkt_)
 
 int main()
 {
-
     I2C_Init();          // initialize i2c interface to display
     InitializeDisplay(); // initialize  display
     clear_display();     // use this before writing you own text
@@ -108,20 +97,30 @@ int main()
 }
 
 /**
- * @brief interrupt
+ * @brief Calculate XOR8 checksum
+ */
+uint8_t CalculateXOR8(uint8_t *data, uint16_t length)
+{
+    uint8_t checksum = 0;
+    for (uint16_t i = 0; i < length; i++)
+    {
+        checksum ^= data[i];
+    }
+    return checksum;
+}
+
+/**
+ * @brief USART1 RX interrupt - receives and parses LabVIEW protocol packets
  */
 ISR(USART1_RX_vect)
 {
     static int i = 0;
-    uint8_t received = UDR1; // Read the received byte
+    static uint16_t expectedLength = 0;
+    uint8_t received = UDR1;
 
     inputBytes[i++] = received;
 
-    // char debugBuf[12];
-    // sprintf(debugBuf, "%d", i);
-    // SendStrActualXY(debugBuf, 0, 3);
-
-    //     // check if we received start bytes
+    // State 1: Look for sync bytes (0x55 0xAA)
     if (i == 1)
     {
         if (inputBytes[0] != 0x55)
@@ -131,33 +130,52 @@ ISR(USART1_RX_vect)
         }
     }
     if (i == 2)
+    {
         if (inputBytes[1] != 0xAA)
         {
             i = 0;
             return;
         }
-
-    // get length bytes and type
-    if (i <= 5)
-        return;
-
-    // get data
-    if (i < (int)((inputBytes[2] << 8) | inputBytes[3]) - 1)
-        return;
-
-    // check parity
-    if (inputBytes[i] != 0x00 || inputBytes[i - 1] != 0x00)
-    {
-        i = 0;
     }
-    else
-    { // store data in packet
-        storedInput.packetLength = ((uint16_t)inputBytes[2] << 8) | (uint16_t)inputBytes[3];
-        storedInput.type = inputBytes[4];
-        memcpy(storedInput.data, &inputBytes[5], storedInput.packetLength - 7);
-        storedInput.crc = ((uint16_t)inputBytes[storedInput.packetLength - 2] << 8) | (uint16_t)inputBytes[storedInput.packetLength - 1];
 
-        receiveFlag = 1; // Set the flag the indicates that we've recieved the input
-        i = 0;           // Reset index}
+    // State 2: Get length (bytes 2-3, big-endian)
+    if (i == 4)
+    {
+        expectedLength = ((uint16_t)inputBytes[2] << 8) | (uint16_t)inputBytes[3];
+
+        // Safety check: packet too long
+        if (expectedLength > MaxInputLength || expectedLength < 5)
+        {
+            i = 0;
+            return;
+        }
+    }
+
+    // State 3: Read rest of packet until we have expectedLength bytes
+    if (i < expectedLength)
+    {
+        return; // Keep collecting bytes
+    }
+
+    // State 4: Complete packet received - validate and parse
+    if (i >= expectedLength)
+    {
+        // Validate checksum (simplified XOR8 for now)
+        uint8_t calculatedChecksum = CalculateXOR8(&inputBytes[4], expectedLength - 6);
+        uint8_t receivedChecksum = inputBytes[expectedLength - 1];
+
+        if (calculatedChecksum == receivedChecksum || receivedChecksum == 0x00)
+        {
+            // Valid packet - store it
+            storedInput.packetLength = expectedLength;
+            storedInput.type = inputBytes[4];
+            storedInput.dataLength = expectedLength - 7; // Minus sync, length, type, crc
+            memcpy(storedInput.data, &inputBytes[5], storedInput.dataLength);
+            storedInput.crc = ((uint16_t)inputBytes[expectedLength - 2] << 8) | (uint16_t)inputBytes[expectedLength - 1];
+
+            receiveFlag = 1; // Signal main loop
+        }
+
+        i = 0; // Reset for next packet
     }
 }
