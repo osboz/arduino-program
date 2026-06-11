@@ -50,6 +50,37 @@ void SendStrActualXY(char *_string, int _x, int _y)
     sendStrXY(_string, _y, _x);
 }
 
+/**
+ * @brief prints the packet info to the OLED
+ *
+ * @param pkt_ package with data
+ */
+void PrintPackageToDisplay(Packet pkt_)
+{
+    char buffer[64];
+    putstrUSART0("input is: ");
+    putstrUSART0(pkt_.data);
+    putchUSART0('\n');
+    putstrUSART1("input is: ");
+    putstrUSART1(pkt_.data);
+    putchUSART1('\n');
+
+    sprintf(buffer, "PkLn: %2d", pkt_.packetLength);
+    SendStrActualXY(buffer, 0, 1);
+    sprintf(buffer, "type: %2d", pkt_.type);
+    SendStrActualXY(buffer, 0, 2);
+    SendStrActualXY("data:", 0, 3);
+
+    for (int k = 0; k < pkt_.packetLength - 7; k++)
+    {
+        char hexBuf[8];
+        sprintf(hexBuf, "%02X ", pkt_.data[k]);
+        SendStrActualXY(hexBuf, k * 2 + 6, 3);
+    }
+    sprintf(buffer, "crc:  %2x", pkt_.crc);
+    SendStrActualXY(buffer, 0, 4);
+}
+
 int main()
 {
 
@@ -62,40 +93,16 @@ int main()
 
     // initialize timer 1 with a comparevalue
     InitTimer1(249);
-    itsTime = 0;
 
     INIT_INTERRUPT(4);
     sei();
-
-    char buffer[512];
 
     while (1)
     {
         if (receiveFlag)
         {
             receiveFlag = 0;
-            putstrUSART0("input is: ");
-            putstrUSART0(storedInput.data);
-            putchUSART0('\n');
-            putstrUSART1("input is: ");
-            putstrUSART1(storedInput.data);
-            putchUSART1('\n');
-
-            sprintf(buffer, "PkLn: %2d", storedInput.packetLength);
-            SendStrActualXY(buffer, 0, 1);
-            sprintf(buffer, "type: %2d", storedInput.type);
-            SendStrActualXY(buffer, 0, 2);
-            SendStrActualXY("data:", 0, 3);
-
-            for (int k = 0; k < storedInput.packetLength - 7; k++)
-            {
-                char hexBuf[8];
-                sprintf(hexBuf, "%02X ", storedInput.data[k]);
-                SendStrActualXY(hexBuf, k * 2 + 6, 3);
-            }
-            sprintf(buffer, "crc:  %2x", storedInput.crc);
-            SendStrActualXY(buffer, 0, 4);
-
+            PrintPackageToDisplay(storedInput);
         }
     }
 }
