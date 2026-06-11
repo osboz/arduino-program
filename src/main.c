@@ -122,21 +122,18 @@ ISR(USART1_RX_vect)
 
     // State 1: Look for sync bytes (0x55 0xAA)
     if (i == 1)
-    {
         if (inputBytes[0] != 0x55)
         {
             i = 0;
             return;
         }
-    }
+
     if (i == 2)
-    {
         if (inputBytes[1] != 0xAA)
         {
             i = 0;
             return;
         }
-    }
 
     // State 2: Get length (bytes 2-3, big-endian)
     if (i == 4)
@@ -153,9 +150,7 @@ ISR(USART1_RX_vect)
 
     // State 3: Read rest of packet until we have expectedLength bytes
     if (i < expectedLength)
-    {
         return; // Keep collecting bytes
-    }
 
     // State 4: Complete packet received - validate and parse
     if (i >= expectedLength)
