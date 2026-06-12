@@ -15,7 +15,6 @@ void SPI_MasterInit(void)
 }
 /**
  * @brief sends a 8bit value tothe slave and retu
- *
  * @param out 8bit value to send
  * @return uint8_t 8bit return value 
  */
