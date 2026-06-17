@@ -217,7 +217,7 @@ void ProcessStartCommand(Packet *pkt)
  */
 void SendOscilloscopeData(uint16_t numSamples, uint8_t *samples)
 {
-    uint16_t packetLength = 5 + numSamples + 2; // Sync(2) + Len(2) + Type(1) + Data(n) + CRC(2)
+    size_t packetLength = numSamples + 7; // Sync(2) + Len(2) + Type(1) + Data(n) + CRC(2)
 
     // Send header
     putchUART1(0x55);
@@ -397,6 +397,7 @@ ISR(TIMER1_COMPA_vect)
     ADCSRA |= (1 << ADSC); // enables adc
 }
 
+// read adc data
 ISR(ADC_vect)
 {
     static int i = 0;
