@@ -11,6 +11,7 @@
 #include "functions.h"
 #include "spiFunctions.h"
 #include "adcFunctions.h"
+#include "Labview.h"
 
 #define BAUD 115200
 #define MY_UBRRD F_CPU / 8 / BAUD - 1  // double speed
@@ -21,20 +22,12 @@
 volatile int receiveFlag = 0, AdcReady = 0;
 volatile char byte = 0;
 uint8_t inputBytes[MaxInputLength];
-uint8_t generatorSettings[5] = {0};
-uint8_t AdcData1[1024];
-uint8_t AdcData2[1024];
 
+uint8_t generatorSettings[5] = {0};
 uint16_t oscilloscopeSettings[2] = {10000, 300};
 
-typedef struct
-{
-    uint16_t packetLength;
-    uint8_t type;
-    uint16_t dataLength;
-    uint8_t data[MaxInputLength - 7];
-    uint16_t crc;
-} Packet;
+uint8_t AdcData1[1024];
+uint8_t AdcData2[1024];
 
 Packet storedInput = {0};
 
@@ -46,230 +39,6 @@ Packet storedInput = {0};
         PORT##E |= (1 << PE##nr);     \
         EIMSK |= (1 << INT##nr);      \
     } while (0)
-
-/**
- * @brief prints the packet info to the OLED
- *
- * @param pkt_ package with data
- */
-void PrintPackageToDisplay(Packet pkt_)
-{
-    char buffer[64];
-    putstrUART0("Packet received:\n");
-    SendStrActualXY("Packet received", 0, 0);
-
-    // Print packet length
-    sprintf(buffer, "PkLen: %d\n", pkt_.packetLength);
-    putstrUART0(buffer);
-    SendStrActualXY(buffer, 0, 1);
-
-    // Print type
-    sprintf(buffer, "Type: %d\n", pkt_.type);
-    putstrUART0(buffer);
-    SendStrActualXY(buffer, 0, 2);
-
-    // Print data as hex (not as raw binary)
-    putstrUART0("Data (hex): ");
-    for (int k = 0; k < pkt_.dataLength; k++)
-    {
-        sprintf(buffer, "%02X ", pkt_.data[k]);
-        putstrUART0(buffer);
-        SendStrActualXY(buffer, 2 * k + 1, 3);
-    }
-    putchUART0('\n');
-
-    // Print CRC
-    sprintf(buffer, "CRC: %04X\n", pkt_.crc);
-    putstrUART0(buffer);
-    SendStrActualXY(buffer, 0, 4);
-}
-
-void SendDataToLabView(uint16_t dataLenght, uint8_t *data, uint8_t type, uint16_t crc)
-{
-    putchUART1(0X55);
-    putchUART1(0xAA);
-    putchUART1(((dataLenght + 7) >> 8) & 0xFF); // Length H (big-endian)
-    putchUART1(dataLenght + 7 & 0xFF);        // Length L
-    putchUART1(type);
-    for (size_t i = 0; i < dataLenght; i++)
-        putchUART1(data[i]);
-    putchUART1((crc >> 8) & 0xFF); // Length H (big-endian)
-    putchUART1(crc & 0xFF);        // Length L
-}
-
-/**
- * @brief
- *
- * @param pkt
- */
-void ProcessLabViewCommand(Packet *pkt)
-{
-    switch (pkt->type)
-    {
-    case 0x01: // BTN pressed
-        ProcessButtonCommand(pkt);
-        break;
-
-    case 0x02: // SEND pressed (sample rate + record length)
-        ProcessSendCommand(pkt);
-        break;
-
-    case 0x03: // START pressed (Bode plot)
-        ProcessStartCommand(pkt);
-        break;
-
-    default:
-        putstrUART0("Unknown command type\n");
-        break;
-    }
-}
-
-/**
- * @brief Process BTN command (Type 0x01)
- * Data: [BTN_Value (1 byte)][SW_Value (1 byte)]
- *
- * Note: LabVIEW uses 0-based button indexing (BTN0=0x00, BTN1=0x01, etc.)
- *       FPGA uses 1-based button indexing (BTN1=0x01, BTN2=0x02, etc.)
- *       Therefore we increment btnValue by 1 before sending to FPGA
- */
-void ProcessButtonCommand(Packet *pkt)
-{
-    uint8_t btnValue = pkt->data[0]; // 0x00=BTN0, 0x01=BTN1, 0x02=BTN2, 0x03=BTN3 (from LabVIEW)
-    uint8_t swValue = pkt->data[1];  // Software value (parameter)
-
-    switch (btnValue)
-    {
-        // assign switch value
-    case 0:
-        generatorSettings[generatorSettings[0] + 1] = swValue;
-        break;
-
-        // increment button value
-    case 1:
-        generatorSettings[0] = (generatorSettings[0] + 1) % 3;
-        break;
-
-        // toggle run/stop
-    case 2:
-        generatorSettings[4] = (generatorSettings[4] + 1) % 2;
-        break;
-
-        // reset all
-    case 3:
-        generatorSettings[0] = 0;
-        generatorSettings[1] = 0;
-        generatorSettings[2] = 0;
-        generatorSettings[3] = 0;
-        generatorSettings[4] = 0;
-        break;
-
-    default:
-        putstrUART0("default uhoh");
-        break;
-    }
-
-    UpdateGeneratorStatus(generatorSettings, 11);
-
-    // SPI ting
-    // Send to FPGA via SPI
-    // SPI_MasterTransfer(swValue);
-    // SPI_MasterTransfer(fpgaBtnValue);
-}
-
-/**
- * @brief Process SEND command (Type 0x02)
- * Data: [SampleRate_H][SampleRate_L][RecordLength_H][RecordLength_L]
- */
-void ProcessSendCommand(Packet *pkt)
-{
-    uint16_t sampleRate = ((uint16_t)pkt->data[0] << 8) | (uint16_t)pkt->data[1];
-    uint16_t recordLength = ((uint16_t)pkt->data[2] << 8) | (uint16_t)pkt->data[3];
-
-    // Update ADC configuration
-    SetFreqTimer1(sampleRate);
-
-    // Send new sample rate and record length to LabVIEW via UART
-    uint8_t data[] = {sampleRate >> 8, sampleRate & 0xFF, recordLength >> 8, recordLength & 0xFF};
-    SendDataToLabView(4, data, 2, 0x0000);
-
-    // Store new sample rate and record length in settings
-    oscilloscopeSettings[0] = sampleRate;
-    oscilloscopeSettings[1] = recordLength;
-
-    // Send oscilloscope data packet back to LabVIEW (instead of using SendDataToLabView)
-    // uint8_t samples[] = //spi
-    // SendOscilloscopeData(samples, 4);
-}
-
-/**
- * @brief Process START command (Type 0x03)
- * Data: empty
- */
-void ProcessStartCommand(Packet *pkt)
-{
-    putstrUART0("Bode plot START received\n");
-    // Start frequency sweep or trigger action
-}
-
-/**
- * @brief Send oscilloscope data packet back to LabVIEW
- * Type: 0x02 (OSCILLOSCOPE telecommand)
- */
-void SendOscilloscopeData(uint16_t numSamples, uint8_t *samples)
-{
-    size_t packetLength = numSamples + 7; // Sync(2) + Len(2) + Type(1) + Data(n) + CRC(2)
-
-    // Send header
-    putchUART1(0x55);
-    putchUART1(0xAA);
-    putchUART1((packetLength >> 8) & 0xFF); // Length H (big-endian)
-    putchUART1(packetLength & 0xFF);        // Length L
-    putchUART1(0x02);                       // Type: OSCILLOSCOPE
-
-    // Send sample data
-    // uint8_t checksum = 0;
-    // checksum ^= 0x02; // Start with type in checksum
-
-    for (uint16_t i = 0; i < numSamples; i++)
-    {
-        putchUART1(samples[i]);
-        // checksum ^= samples[i];
-    }
-
-    // Send checksum
-    putchUART1(0x00); // CRC high (unused for XOR8)
-    putchUART1(0x00); // CRC high (unused for XOR8)
-    // putchUART1(checksum); // CRC low (XOR8)
-}
-
-/**
- * @brief Send generator status back to LabVIEW
- * Type: 0x01 (GENERATOR telecommand)
- */
-void UpdateGeneratorStatus(uint8_t *data, int dataLength)
-{
-    unsigned char msb = (unsigned)dataLength >> 8;   // shift the higher 8 bits
-    unsigned char lsb = (unsigned)dataLength & 0xff; // mask the lower 8 bits
-
-    SendDataToLabView(4, data, 1, 0x0000);
-    putchUART1(0x55);
-    putchUART1(0xAA);
-    putchUART1(msb);
-    putchUART1(lsb);
-    putchUART1(0x01); // Type: GENERATOR
-
-    for (size_t i = 0; i < 4; i++)
-        putchUART1(data[i]);
-
-    putchUART1(0x00);
-    putchUART1(0x00);
-
-    // for lrc8 checsum
-    // uint8_t checksum = 0x01;
-    // for (size_t i; i < 4; i++)
-    //     checksum ^= data[i];
-    // putchUART1(checksum);
-}
 
 int main()
 {
@@ -306,19 +75,6 @@ int main()
             ProcessLabViewCommand(&storedInput);
         }
     }
-}
-
-/**
- * @brief Calculate XOR8 checksum
- */
-uint8_t CalculateXOR8(uint8_t *data, size_t length)
-{
-    uint8_t checksum = 0;
-    for (size_t i = 0; i < length; i++)
-    {
-        checksum ^= data[i];
-    }
-    return checksum;
 }
 
 /**
