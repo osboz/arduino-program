@@ -10,6 +10,8 @@ int itsTime;
  */
 void InitTimer1(unsigned int _compareValue);
 
+
+
 /**
  * @brief timer 1 interrupt, se
  * @var itsTime = 1 every second

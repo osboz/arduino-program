@@ -10,6 +10,7 @@
 #include "usart.h"
 #include "functions.h"
 #include "spiFunctions.h"
+#include "adcFunctions.h"
 
 #define BAUD 115200
 #define MY_UBRRD F_CPU / 8 / BAUD - 1  // double speed
@@ -17,10 +18,14 @@
 
 #define MaxInputLength 512
 
-volatile int receiveFlag = 0, receiveFlag2 = 0;
+volatile int receiveFlag = 0, AdcReady = 0;
 volatile char byte = 0;
 uint8_t inputBytes[MaxInputLength];
-uint8_t generatorSettings[4] = {0};
+uint8_t generatorSettings[5] = {0};
+uint8_t AdcData1[1024];
+uint8_t AdcData2[1024];
+
+uint16_t oscilloscopeSettings[2] = {10000, 300};
 
 typedef struct
 {
@@ -51,50 +56,42 @@ void PrintPackageToDisplay(Packet pkt_)
 {
     char buffer[64];
     putstrUART0("Packet received:\n");
-    putstrUART1("Packet received:\n");
     SendStrActualXY("Packet received", 0, 0);
 
     // Print packet length
     sprintf(buffer, "PkLen: %d\n", pkt_.packetLength);
     putstrUART0(buffer);
-    putstrUART1(buffer);
     SendStrActualXY(buffer, 0, 1);
 
     // Print type
     sprintf(buffer, "Type: %d\n", pkt_.type);
     putstrUART0(buffer);
-    putstrUART1(buffer);
     SendStrActualXY(buffer, 0, 2);
 
     // Print data as hex (not as raw binary)
     putstrUART0("Data (hex): ");
-    putstrUART1("Data (hex): ");
     for (int k = 0; k < pkt_.dataLength; k++)
     {
         sprintf(buffer, "%02X ", pkt_.data[k]);
         putstrUART0(buffer);
-        putstrUART1(buffer);
         SendStrActualXY(buffer, 2 * k + 1, 3);
     }
     putchUART0('\n');
-    putchUART1('\n');
 
     // Print CRC
     sprintf(buffer, "CRC: %04X\n", pkt_.crc);
     putstrUART0(buffer);
-    putstrUART1(buffer);
     SendStrActualXY(buffer, 0, 4);
 }
 
-void SendDataToLabView(uint16_t PackLenght, uint8_t data[], uint8_t type, uint16_t crc)
+void SendDataToLabView(uint16_t dataLenght, uint8_t *data, uint8_t type, uint16_t crc)
 {
-    putstrUART0("\n testsend");
     putchUART1(0X55);
     putchUART1(0xAA);
-    putchUART1((PackLenght >> 8) & 0xFF); // Length H (big-endian)
-    putchUART1(PackLenght & 0xFF);        // Length L
+    putchUART1(((dataLenght + 7) >> 8) & 0xFF); // Length H (big-endian)
+    putchUART1(dataLenght + 7 & 0xFF);        // Length L
     putchUART1(type);
-    for (size_t i; i < PackLenght - 7; i++)
+    for (size_t i = 0; i < dataLenght; i++)
         putchUART1(data[i]);
     putchUART1((crc >> 8) & 0xFF); // Length H (big-endian)
     putchUART1(crc & 0xFF);        // Length L
@@ -114,7 +111,7 @@ void ProcessLabViewCommand(Packet *pkt)
         break;
 
     case 0x02: // SEND pressed (sample rate + record length)
-        // ProcessSendCommand(pkt);
+        ProcessSendCommand(pkt);
         break;
 
     case 0x03: // START pressed (Bode plot)
@@ -137,31 +134,35 @@ void ProcessLabViewCommand(Packet *pkt)
  */
 void ProcessButtonCommand(Packet *pkt)
 {
-
     uint8_t btnValue = pkt->data[0]; // 0x00=BTN0, 0x01=BTN1, 0x02=BTN2, 0x03=BTN3 (from LabVIEW)
     uint8_t swValue = pkt->data[1];  // Software value (parameter)
 
     switch (btnValue)
     {
+        // assign switch value
     case 0:
         generatorSettings[generatorSettings[0] + 1] = swValue;
         break;
 
+        // increment button value
     case 1:
-        generatorSettings[0] = ((generatorSettings[0] + 1) % 3);
+        generatorSettings[0] = (generatorSettings[0] + 1) % 3;
         break;
 
+        // toggle run/stop
     case 2:
-        // run/stop
+        generatorSettings[4] = (generatorSettings[4] + 1) % 2;
         break;
 
+        // reset all
     case 3:
         generatorSettings[0] = 0;
         generatorSettings[1] = 0;
         generatorSettings[2] = 0;
         generatorSettings[3] = 0;
-
+        generatorSettings[4] = 0;
         break;
+
     default:
         putstrUART0("default uhoh");
         break;
@@ -169,7 +170,7 @@ void ProcessButtonCommand(Packet *pkt)
 
     UpdateGeneratorStatus(generatorSettings, 11);
 
-    // OLD
+    // SPI ting
     // Send to FPGA via SPI
     // SPI_MasterTransfer(swValue);
     // SPI_MasterTransfer(fpgaBtnValue);
@@ -181,18 +182,23 @@ void ProcessButtonCommand(Packet *pkt)
  */
 void ProcessSendCommand(Packet *pkt)
 {
-    if (pkt->dataLength < 4)
-        return;
-
     uint16_t sampleRate = ((uint16_t)pkt->data[0] << 8) | (uint16_t)pkt->data[1];
     uint16_t recordLength = ((uint16_t)pkt->data[2] << 8) | (uint16_t)pkt->data[3];
 
-    char buffer[64];
-    sprintf(buffer, "Sample Rate: %d sps, Record Length: %d\n", sampleRate, recordLength);
-    putstrUART0(buffer);
-
     // Update ADC configuration
-    // SetADCParameters(sampleRate, recordLength);
+    SetFreqTimer1(sampleRate);
+
+    // Send new sample rate and record length to LabVIEW via UART
+    uint8_t data[] = {sampleRate >> 8, sampleRate & 0xFF, recordLength >> 8, recordLength & 0xFF};
+    SendDataToLabView(4, data, 2, 0x0000);
+
+    // Store new sample rate and record length in settings
+    oscilloscopeSettings[0] = sampleRate;
+    oscilloscopeSettings[1] = recordLength;
+
+    // Send oscilloscope data packet back to LabVIEW (instead of using SendDataToLabView)
+    // uint8_t samples[] = //spi
+    // SendOscilloscopeData(samples, 4);
 }
 
 /**
@@ -209,7 +215,7 @@ void ProcessStartCommand(Packet *pkt)
  * @brief Send oscilloscope data packet back to LabVIEW
  * Type: 0x02 (OSCILLOSCOPE telecommand)
  */
-void SendOscilloscopeData(uint8_t *samples, uint16_t numSamples)
+void SendOscilloscopeData(uint16_t numSamples, uint8_t *samples)
 {
     uint16_t packetLength = 5 + numSamples + 2; // Sync(2) + Len(2) + Type(1) + Data(n) + CRC(2)
 
@@ -221,18 +227,19 @@ void SendOscilloscopeData(uint8_t *samples, uint16_t numSamples)
     putchUART1(0x02);                       // Type: OSCILLOSCOPE
 
     // Send sample data
-    uint8_t checksum = 0;
-    checksum ^= 0x02; // Start with type in checksum
+    // uint8_t checksum = 0;
+    // checksum ^= 0x02; // Start with type in checksum
 
     for (uint16_t i = 0; i < numSamples; i++)
     {
         putchUART1(samples[i]);
-        checksum ^= samples[i];
+        // checksum ^= samples[i];
     }
 
     // Send checksum
-    putchUART1(0x00);     // CRC high (unused for XOR8)
-    putchUART1(checksum); // CRC low (XOR8)
+    putchUART1(0x00); // CRC high (unused for XOR8)
+    putchUART1(0x00); // CRC high (unused for XOR8)
+    // putchUART1(checksum); // CRC low (XOR8)
 }
 
 /**
@@ -243,13 +250,15 @@ void UpdateGeneratorStatus(uint8_t *data, int dataLength)
 {
     unsigned char msb = (unsigned)dataLength >> 8;   // shift the higher 8 bits
     unsigned char lsb = (unsigned)dataLength & 0xff; // mask the lower 8 bits
+
+    SendDataToLabView(4, data, 1, 0x0000);
     putchUART1(0x55);
     putchUART1(0xAA);
     putchUART1(msb);
     putchUART1(lsb);
     putchUART1(0x01); // Type: GENERATOR
 
-    for (size_t i; i < 4; i++)
+    for (size_t i = 0; i < 4; i++)
         putchUART1(data[i]);
 
     putchUART1(0x00);
@@ -273,23 +282,28 @@ int main()
     uart0_Init(MY_UBRRD); // Initialize UART0
 
     SPI_MasterInit();
+    init_adc();
+    sei();
 
     // initialize timer 1 with a comparevalue
-    // InitTimer1(249);
+    InitTimer1(oscilloscopeSettings[0]);
 
     // INIT_INTERRUPT(4);
-    sei();
 
     while (1)
     {
+        if (AdcReady)
+        {
+            SendDataToLabView(oscilloscopeSettings[1], AdcData1, 2, 0x0000);
+            AdcReady = false;
+        }
+
         if (receiveFlag)
         {
-            _delay_ms(10);
             receiveFlag = 0;
             // Process the command
             PrintPackageToDisplay(storedInput);
             ProcessLabViewCommand(&storedInput);
-            // SendDataToLabView(storedInput.dataLength, storedInput.data, storedInput.type, storedInput.crc);
         }
     }
 }
@@ -373,5 +387,24 @@ ISR(USART1_RX_vect)
         }
 
         i = 0; // Reset for next packet
+    }
+}
+
+// Timer interrupt service routine. updates channel and enables adc
+ISR(TIMER1_COMPA_vect)
+{
+    // Start ADC conversion
+    ADCSRA |= (1 << ADSC); // enables adc
+}
+
+ISR(ADC_vect)
+{
+    static int i = 0;
+    AdcData1[i++] = ADC;
+    if (i >= oscilloscopeSettings[1])
+    {
+        memcpy(AdcData2, AdcData1, oscilloscopeSettings[1]);
+        i = 0;
+        AdcReady = true;
     }
 }

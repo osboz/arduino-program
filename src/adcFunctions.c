@@ -1,5 +1,5 @@
 #include <avr/io.h>
-#include "pwmFunctions.h"
+#include "adcFunctions.h"
 
 void setupPins()
 {
