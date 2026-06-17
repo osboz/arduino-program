@@ -152,3 +152,154 @@
 // {
 //     button4Flag = 1;
 // }
+
+
+
+
+// /**
+//  * @brief
+//  *
+//  * @param pkt
+//  */
+// void ProcessLabViewCommand(Packet *pkt)
+// {
+//     switch (pkt->type)
+//     {
+//     case 0x01: // BTN pressed
+//         ProcessButtonCommand(pkt);
+//         break;
+
+//     case 0x02: // SEND pressed (sample rate + record length)
+//         ProcessSendCommand(pkt);
+//         break;
+
+//     case 0x03: // START pressed (Bode plot)
+//         ProcessStartCommand(pkt);
+//         break;
+
+//     default:
+//         putstrUSART0("Unknown command type\n");
+//         break;
+//     }
+// }
+
+// /**
+//  * @brief Process BTN command (Type 0x01)
+//  * Data: [BTN_Value (1 byte)][SW_Value (1 byte)]
+//  *
+//  * Note: LabVIEW uses 0-based button indexing (BTN0=0x00, BTN1=0x01, etc.)
+//  *       FPGA uses 1-based button indexing (BTN1=0x01, BTN2=0x02, etc.)
+//  *       Therefore we increment btnValue by 1 before sending to FPGA
+//  */
+// void ProcessButtonCommand(Packet *pkt)
+// {
+//     if (pkt->dataLength < 2)
+//         return;
+
+//     uint8_t btnValue = pkt->data[0]; // 0x00=BTN0, 0x01=BTN1, 0x02=BTN2, 0x03=BTN3 (from LabVIEW)
+//     uint8_t swValue = pkt->data[1];  // Software value (parameter)
+
+//     char buffer[64];
+//     sprintf(buffer, "BTN %d pressed, SW=0x%02X\n", btnValue, swValue);
+//     putstrUSART0(buffer);
+
+//     // Increment btnValue for FPGA (FPGA uses 1-based indexing)
+//     uint8_t fpgaBtnValue = btnValue + 1; // Convert to FPGA indexing: 0x00->0x01, 0x01->0x02, etc.
+//     sprintf(buffer, "BTNFpga %hx\n", fpgaBtnValue);
+//     putstrUSART0(buffer);
+
+//     // Send to FPGA via SPI
+//     SPI_MasterTransfer(swValue);
+//     SPI_MasterTransfer(fpgaBtnValue);
+// }
+
+// /**
+//  * @brief Process SEND command (Type 0x02)
+//  * Data: [SampleRate_H][SampleRate_L][RecordLength_H][RecordLength_L]
+//  */
+// void ProcessSendCommand(Packet *pkt)
+// {
+//     if (pkt->dataLength < 4)
+//         return;
+
+//     uint16_t sampleRate = ((uint16_t)pkt->data[0] << 8) | (uint16_t)pkt->data[1];
+//     uint16_t recordLength = ((uint16_t)pkt->data[2] << 8) | (uint16_t)pkt->data[3];
+
+//     char buffer[64];
+//     sprintf(buffer, "Sample Rate: %d sps, Record Length: %d\n", sampleRate, recordLength);
+//     putstrUSART0(buffer);
+
+//     // Update ADC configuration
+//     // SetADCParameters(sampleRate, recordLength);
+// }
+
+// /**
+//  * @brief Process START command (Type 0x03)
+//  * Data: empty
+//  */
+// void ProcessStartCommand(Packet *pkt)
+// {
+//     putstrUSART0("Bode plot START received\n");
+//     // Start frequency sweep or trigger action
+// }
+
+// /**
+//  * @brief Send oscilloscope data packet back to LabVIEW
+//  * Type: 0x02 (OSCILLOSCOPE telecommand)
+//  */
+// void SendOscilloscopeData(uint8_t *samples, uint16_t numSamples)
+// {
+//     uint16_t packetLength = 5 + numSamples + 2; // Sync(2) + Len(2) + Type(1) + Data(n) + CRC(2)
+
+//     // Send header
+//     putchUSART0(0x55);
+//     putchUSART0(0xAA);
+//     putchUSART0((packetLength >> 8) & 0xFF); // Length H (big-endian)
+//     putchUSART0(packetLength & 0xFF);        // Length L
+//     putchUSART0(0x02);                       // Type: OSCILLOSCOPE
+
+//     // Send sample data
+//     uint8_t checksum = 0;
+//     checksum ^= 0x02; // Start with type in checksum
+
+//     for (uint16_t i = 0; i < numSamples; i++)
+//     {
+//         putchUSART0(samples[i]);
+//         checksum ^= samples[i];
+//     }
+
+//     // Send checksum
+//     putchUSART0(0x00);     // CRC high (unused for XOR8)
+//     putchUSART0(checksum); // CRC low (XOR8)
+// }
+
+// /**
+//  * @brief Send generator status back to LabVIEW
+//  * Type: 0x01 (GENERATOR telecommand)
+//  */
+// void SendGeneratorStatus(uint8_t active, uint8_t shape, uint8_t amplitude, uint8_t frequency)
+// {
+//     uint16_t packetLength = 9; // Sync(2) + Len(2) + Type(1) + Data(4) + CRC(2)
+
+//     putchUSART0(0x55);
+//     putchUSART0(0xAA);
+//     putchUSART0(0x00);
+//     putchUSART0(0x09);
+//     putchUSART0(0x01); // Type: GENERATOR
+
+//     uint8_t checksum = 0x01;
+//     putchUSART0(active);
+//     checksum ^= active;
+
+//     putchUSART0(shape);
+//     checksum ^= shape;
+
+//     putchUSART0(amplitude);
+//     checksum ^= amplitude;
+
+//     putchUSART0(frequency);
+//     checksum ^= frequency;
+
+//     putchUSART0(0x00);
+//     putchUSART0(checksum);
+// }

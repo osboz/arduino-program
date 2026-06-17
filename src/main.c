@@ -20,6 +20,7 @@
 volatile int receiveFlag = 0, receiveFlag2 = 0;
 volatile char byte = 0;
 uint8_t inputBytes[MaxInputLength];
+uint8_t settings[64];
 
 typedef struct
 {
@@ -30,7 +31,7 @@ typedef struct
     uint16_t crc;
 } Packet;
 
-volatile Packet storedInput = {0};
+Packet storedInput = {0};
 
 // marco to define an interrupt based on number input
 #define INIT_INTERRUPT(nr)            \
@@ -49,35 +50,54 @@ volatile Packet storedInput = {0};
 void PrintPackageToDisplay(Packet pkt_)
 {
     char buffer[64];
-    putstrUSART0("Packet received:\n");
-    putstrUSART1("Packet received:\n");
+    putstrUART0("Packet received:\n");
+    putstrUART1("Packet received:\n");
+    SendStrActualXY("Packet received", 0, 0);
 
     // Print packet length
     sprintf(buffer, "PkLen: %d\n", pkt_.packetLength);
-    putstrUSART0(buffer);
-    putstrUSART1(buffer);
+    putstrUART0(buffer);
+    putstrUART1(buffer);
+    SendStrActualXY(buffer, 0, 1);
 
     // Print type
     sprintf(buffer, "Type: %d\n", pkt_.type);
-    putstrUSART0(buffer);
-    putstrUSART1(buffer);
+    putstrUART0(buffer);
+    putstrUART1(buffer);
+    SendStrActualXY(buffer, 0, 2);
 
     // Print data as hex (not as raw binary)
-    putstrUSART0("Data (hex): ");
-    putstrUSART1("Data (hex): ");
+    putstrUART0("Data (hex): ");
+    putstrUART1("Data (hex): ");
     for (int k = 0; k < pkt_.dataLength; k++)
     {
         sprintf(buffer, "%02X ", pkt_.data[k]);
-        putstrUSART0(buffer);
-        putstrUSART1(buffer);
+        putstrUART0(buffer);
+        putstrUART1(buffer);
+        SendStrActualXY(buffer, 2 * k + 1, 3);
     }
-    putchUSART0('\n');
-    putchUSART1('\n');
+    putchUART0('\n');
+    putchUART1('\n');
 
     // Print CRC
     sprintf(buffer, "CRC: %04X\n", pkt_.crc);
-    putstrUSART0(buffer);
-    putstrUSART1(buffer);
+    putstrUART0(buffer);
+    putstrUART1(buffer);
+    SendStrActualXY(buffer, 0, 4);
+}
+
+void SendDataToLabView(uint16_t PackLenght, uint8_t data[], uint8_t type, uint16_t crc)
+{
+    putstrUART0("\n testsend");
+    putchUART1(0X55);
+    putchUART1(0xAA);
+    putchUART1((PackLenght >> 8) & 0xFF); // Length H (big-endian)
+    putchUART1(PackLenght & 0xFF);        // Length L
+    putchUART1(type);
+    for (size_t i; i < PackLenght - 7; i++)
+        putchUART1(data[i]);
+    putchUART1((crc >> 8) & 0xFF); // Length H (big-endian)
+    putchUART1(crc & 0xFF);        // Length L
 }
 
 /**
@@ -94,7 +114,7 @@ void ProcessLabViewCommand(Packet *pkt)
         break;
 
     case 0x02: // SEND pressed (sample rate + record length)
-        ProcessSendCommand(pkt);
+        // ProcessSendCommand(pkt);
         break;
 
     case 0x03: // START pressed (Bode plot)
@@ -123,18 +143,10 @@ void ProcessButtonCommand(Packet *pkt)
     uint8_t btnValue = pkt->data[0]; // 0x00=BTN0, 0x01=BTN1, 0x02=BTN2, 0x03=BTN3 (from LabVIEW)
     uint8_t swValue = pkt->data[1];  // Software value (parameter)
 
-    char buffer[64];
-    sprintf(buffer, "BTN %d pressed, SW=0x%02X\n", btnValue, swValue);
-    putstrUSART0(buffer);
-
-    // Increment btnValue for FPGA (FPGA uses 1-based indexing)
-    uint8_t fpgaBtnValue = btnValue + 1; // Convert to FPGA indexing: 0x00->0x01, 0x01->0x02, etc.
-    sprintf(buffer, "BTNFpga %hx\n", fpgaBtnValue);
-    putstrUSART0(buffer);
-
+    // OLD
     // Send to FPGA via SPI
-    SPI_MasterTransfer(swValue);
-    SPI_MasterTransfer(fpgaBtnValue);
+    // SPI_MasterTransfer(swValue);
+    // SPI_MasterTransfer(fpgaBtnValue);
 }
 
 /**
@@ -176,11 +188,11 @@ void SendOscilloscopeData(uint8_t *samples, uint16_t numSamples)
     uint16_t packetLength = 5 + numSamples + 2; // Sync(2) + Len(2) + Type(1) + Data(n) + CRC(2)
 
     // Send header
-    putchUSART0(0x55);
-    putchUSART0(0xAA);
-    putchUSART0((packetLength >> 8) & 0xFF); // Length H (big-endian)
-    putchUSART0(packetLength & 0xFF);        // Length L
-    putchUSART0(0x02);                       // Type: OSCILLOSCOPE
+    putchUSART1(0x55);
+    putchUSART1(0xAA);
+    putchUSART1((packetLength >> 8) & 0xFF); // Length H (big-endian)
+    putchUSART1(packetLength & 0xFF);        // Length L
+    putchUSART1(0x02);                       // Type: OSCILLOSCOPE
 
     // Send sample data
     uint8_t checksum = 0;
@@ -188,13 +200,13 @@ void SendOscilloscopeData(uint8_t *samples, uint16_t numSamples)
 
     for (uint16_t i = 0; i < numSamples; i++)
     {
-        putchUSART0(samples[i]);
+        putchUSART1(samples[i]);
         checksum ^= samples[i];
     }
 
     // Send checksum
-    putchUSART0(0x00);     // CRC high (unused for XOR8)
-    putchUSART0(checksum); // CRC low (XOR8)
+    putchUSART1(0x00);     // CRC high (unused for XOR8)
+    putchUSART1(checksum); // CRC low (XOR8)
 }
 
 /**
@@ -205,27 +217,27 @@ void SendGeneratorStatus(uint8_t active, uint8_t shape, uint8_t amplitude, uint8
 {
     uint16_t packetLength = 9; // Sync(2) + Len(2) + Type(1) + Data(4) + CRC(2)
 
-    putchUSART0(0x55);
-    putchUSART0(0xAA);
-    putchUSART0(0x00);
-    putchUSART0(0x09);
-    putchUSART0(0x01); // Type: GENERATOR
+    putchUSART1(0x55);
+    putchUSART1(0xAA);
+    putchUSART1(0x00);
+    putchUSART1(0x09);
+    putchUSART1(0x01); // Type: GENERATOR
 
     uint8_t checksum = 0x01;
-    putchUSART0(active);
+    putchUSART1(active);
     checksum ^= active;
 
-    putchUSART0(shape);
+    putchUSART1(shape);
     checksum ^= shape;
 
-    putchUSART0(amplitude);
+    putchUSART1(amplitude);
     checksum ^= amplitude;
 
-    putchUSART0(frequency);
+    putchUSART1(frequency);
     checksum ^= frequency;
 
-    putchUSART0(0x00);
-    putchUSART0(checksum);
+    putchUSART1(0x00);
+    putchUSART1(checksum);
 }
 
 int main()
@@ -251,11 +263,11 @@ int main()
         if (receiveFlag)
         {
             _delay_ms(10);
-            SendStrActualXY("RecFlag", 0, 0);
             receiveFlag = 0;
             // Process the command
-            ProcessLabViewCommand(&storedInput);
+            // ProcessLabViewCommand(&storedInput);
             PrintPackageToDisplay(storedInput);
+            SendDataToLabView(storedInput.dataLength, storedInput.data, storedInput.type, storedInput.crc);
         }
     }
 }
@@ -263,10 +275,10 @@ int main()
 /**
  * @brief Calculate XOR8 checksum
  */
-uint8_t CalculateXOR8(uint8_t *data, uint16_t length)
+uint8_t CalculateXOR8(uint8_t *data, size_t length)
 {
     uint8_t checksum = 0;
-    for (uint16_t i = 0; i < length; i++)
+    for (size_t i = 0; i < length; i++)
     {
         checksum ^= data[i];
     }
@@ -323,9 +335,9 @@ ISR(USART1_RX_vect)
     {
         // Validate checksum (simplified XOR8 for now)
         uint8_t calculatedChecksum = CalculateXOR8(&inputBytes[4], expectedLength - 6);
-        uint8_t receivedChecksum = inputBytes[expectedLength - 1];
+        uint8_t receivedChecksum = inputBytes[expectedLength];
 
-        // if (calculatedChecksum == receivedChecksum || receivedChecksum == 0x00)
+        if (calculatedChecksum == receivedChecksum)
         {
             // Valid packet - store it
             storedInput.packetLength = expectedLength;

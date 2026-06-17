@@ -20,58 +20,58 @@ void uart1_Init(unsigned int ubrr)
     UBRR1L = (unsigned char)ubrr;
 }
 
-void putchUSART0(char tx)
+void putchUART0(char tx)
 {
     while (!(UCSR0A & (1 << UDRE0)))
         ; // wait for empty transmit buffer
     UDR0 = tx;
 }
-void putchUSART1(char tx)
+void putchUART1(char tx)
 {
     while (!(UCSR1A & (1 << UDRE1)))
         ; // wait for empty transmit buffer
     UDR1 = tx;
 }
 
-char getchUSART0(void)
+char getchUART0(void)
 {
     while (!(UCSR0A & (1 << RXC0)))
         ; // wait until a character is received
     return UDR0;
 }
 
-char getchUSART1(void)
+char getchUART1(void)
 {
     while (!(UCSR1A & (1 << RXC1)))
         ; // wait until a character is received
     return UDR1;
 }
 
-void putstrUSART0(char *ptr)
+void putstrUART0(char *ptr)
 {
     while (*ptr)
     {
-        putchUSART0(*ptr);
+        putchUART0(*ptr);
         ptr++;
     }
 }
-void putstrUSART1(char *ptr)
+void putstrUART1(char *ptr)
 {
     while (*ptr)
     {
-        putchUSART1(*ptr);
+        putchUART1(*ptr);
         ptr++;
     }
 }
 
-char *getStrUSART0(char buffer[], int maxLength)
+char *getStrUART0(char buffer[], int maxLength)
 {
     int index = 0; // Initialize index to track position in buffer
 
     while (index < maxLength)
     {
         // Read a character from USART
-        buffer[index] = getchUSART0();
+        buffer[index] = getchUART0();
 
         if (index > 0)
             if (buffer[index - 1] == '\n' || buffer[index] == '\r')
@@ -85,14 +85,14 @@ char *getStrUSART0(char buffer[], int maxLength)
     return buffer;
 }
 
-char *getStrUSART1(char buffer[], int maxLength)
+char *getStrUART1(char buffer[], int maxLength)
 {
     int index = 0; // Initialize index to track position in buffer
 
     while (index < maxLength)
     {
         // Read a character from USART
-        buffer[index] = getchUSART1();
+        buffer[index] = getchUART1();
 
         if (index > 0)
             if (buffer[index - 1] == '\n' || buffer[index] == '\r')
