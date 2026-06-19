@@ -32,17 +32,26 @@ void PrintPackageToDisplay(Packet pkt_)
     SendStrActualXY(buffer, 0, 4);
 }
 
-void SendDataToLabView(uint16_t dataLenght, uint8_t *data, uint8_t type, uint16_t crc)
+void SendDataToLabViewLRC8(uint16_t dataLength, uint8_t *data, uint8_t type)
 {
-    putchUART1(0X55);
+    uint8_t msb = (uint8_t)((dataLength + 7) >> 8);
+    uint8_t lsb = (uint8_t)((dataLength + 7) & 0xFF);
+
+    uint8_t checksum = 0x55 ^ 0xAA ^ msb ^ lsb ^ (uint8_t)type;
+
+    putchUART1(0x55);
     putchUART1(0xAA);
-    putchUART1(((dataLenght + 7) >> 8) & 0xFF); // Length H (big-endian)
-    putchUART1(dataLenght + 7 & 0xFF);          // Length L
+    putchUART1(msb); // Length H (big-endian)
+    putchUART1(lsb); // Length L
     putchUART1(type);
-    for (size_t i = 0; i < dataLenght; i++)
+    for (size_t i = 0; i < dataLength; i++)
+    {
         putchUART1(data[i]);
-    putchUART1((crc >> 8) & 0xFF); // Length H (big-endian)
-    putchUART1(crc & 0xFF);        // Length L
+        checksum ^= data[i];
+    }
+
+    putchUART1(0x00);     // High byte of 2-byte checksum (always 0x00 for single-byte result)
+    putchUART1(checksum); // Low byte checksum
 }
 
 void ProcessLabViewCommand(Packet *pkt)
@@ -103,13 +112,9 @@ void ProcessButtonCommand(Packet *pkt)
         break;
     }
 
-    SendDataToLabView(4, generatorSettings, 1, 0x0000);
+    SendDataToLabViewLRC8(4, generatorSettings, 1);
     SendDataToFPGA(generatorSettings);
-
-    // SPI ting
-    // Send to FPGA via SPI
-    // SPI_MasterTransfer(swValue);
-    // SPI_MasterTransfer(fpgaBtnValue);
+    SendDataToFPGA(generatorSettings);
 }
 
 void ProcessSendCommand(Packet *pkt)
@@ -122,13 +127,13 @@ void ProcessSendCommand(Packet *pkt)
 
     // Send new sample rate and record length to LabVIEW via UART
     uint8_t data[] = {sampleRate >> 8, sampleRate & 0xFF, recordLength >> 8, recordLength & 0xFF};
-    SendDataToLabView(4, data, 2, 0x0000);
+    SendDataToLabViewLRC8(4, data, 2);
 
     // Store new sample rate and record length in settings
     oscilloscopeSettings[0] = sampleRate;
     oscilloscopeSettings[1] = recordLength;
 
-    // Send oscilloscope data packet back to LabVIEW (instead of using SendDataToLabView)
+    // Send oscilloscope data packet back to LabVIEW (instead of using SendDataToLabViewLRC8)
     // uint8_t samples[] = //spi
 }
 
@@ -137,7 +142,7 @@ void ProcessStartCommand(Packet *pkt)
     putstrUART0("Bode plot START received\n");
     // Start frequency sweep or trigger action
 
-    SendDataToLabView(255, pkt->data, 3, 0x0000);
+    SendDataToLabViewLRC8(255, pkt->data, 3);
 }
 
 uint8_t CalculateXOR8(uint8_t *data, size_t length)

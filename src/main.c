@@ -7,7 +7,7 @@
 #include "ssd1306.h" //include display driver
 #include <avr/interrupt.h>
 #include "timer.h"
-#include "usart.h"
+#include "uart.h"
 #include "functions.h"
 #include "spiFunctions.h"
 #include "adcFunctions.h"
@@ -63,7 +63,7 @@ int main()
     {
         if (AdcReady)
         {
-            SendDataToLabView(oscilloscopeSettings[1], AdcData1, 2, 0x0000);
+            SendDataToLabViewLRC8(oscilloscopeSettings[1], AdcData1, 2);
             AdcReady = false;
         }
 
@@ -125,17 +125,16 @@ ISR(USART1_RX_vect)
     // State 4: Complete packet received - validate and parse
     if (i >= expectedLength)
     {
-        // Validate checksum (simplified XOR8 for now)
-        uint8_t calculatedChecksum = CalculateXOR8(&inputBytes[4], expectedLength - 6);
-        uint8_t receivedChecksum = inputBytes[expectedLength];
+        // Validate checksum (XOR of everything except the 2-byte checksum at the end)
+        uint8_t calculatedChecksum = CalculateXOR8(inputBytes, expectedLength - 2);
+        uint8_t receivedChecksum = inputBytes[expectedLength - 1]; // Low byte of 2-byte checksum
 
-        // if (calculatedChecksum == receivedChecksum)
-        if (receivedChecksum == 0x00)
+        if (calculatedChecksum == receivedChecksum)
         {
             // Valid packet - store it
             storedInput.packetLength = expectedLength;
             storedInput.type = inputBytes[4];
-            storedInput.dataLength = expectedLength - 7; // Minus sync, length, type, crc
+            storedInput.dataLength = expectedLength - 7; // Minus sync(2) + length(2) + type(1) + checksum(2)
             memcpy(storedInput.data, &inputBytes[5], storedInput.dataLength);
             storedInput.crc = ((uint16_t)inputBytes[expectedLength - 2] << 8) | (uint16_t)inputBytes[expectedLength - 1];
 
