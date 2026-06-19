@@ -17,7 +17,7 @@
 #define MY_UBRRD F_CPU / 8 / BAUD - 1  // double speed
 #define MY_UBRRH F_CPU / 16 / BAUD - 1 // half
 
-#define MaxInputLength 512
+#define MaxInputLength 1024*2
 
 volatile int receiveFlag = 0, AdcReady = 0;
 volatile char byte = 0;
@@ -26,8 +26,8 @@ uint8_t inputBytes[MaxInputLength];
 uint8_t generatorSettings[5] = {0};
 uint16_t oscilloscopeSettings[2] = {10000, 300};
 
-uint8_t AdcData1[1024];
-uint8_t AdcData2[1024];
+uint8_t AdcData1[MaxInputLength];
+uint8_t AdcData2[MaxInputLength];
 
 Packet storedInput = {0};
 
@@ -57,22 +57,20 @@ int main()
     // initialize timer 1 with a comparevalue
     InitTimer1(oscilloscopeSettings[0]);
 
-    // INIT_INTERRUPT(4);
-
     while (1)
     {
+
+        if (receiveFlag)
+        {
+            // Process the command
+            PrintPackageToDisplay(storedInput);
+            ProcessLabViewCommand(&storedInput);
+            receiveFlag = 0;
+        }
         if (AdcReady)
         {
             SendDataToLabViewLRC8(oscilloscopeSettings[1], AdcData1, 2);
             AdcReady = false;
-        }
-
-        if (receiveFlag)
-        {
-            receiveFlag = 0;
-            // Process the command
-            PrintPackageToDisplay(storedInput);
-            ProcessLabViewCommand(&storedInput);
         }
     }
 }
@@ -156,7 +154,7 @@ ISR(TIMER1_COMPA_vect)
 ISR(ADC_vect)
 {
     static int i = 0;
-    AdcData1[i++] = ADC;
+    AdcData1[i++] = ADC >> 2;
     if (i >= oscilloscopeSettings[1])
     {
         memcpy(AdcData2, AdcData1, oscilloscopeSettings[1]);
