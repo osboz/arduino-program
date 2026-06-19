@@ -32,13 +32,21 @@ void PrintPackageToDisplay(Packet pkt_);
  * @param type 1-3
  * @param crc checksum
  */
-void SendDataToLabView(uint16_t dataLenght, uint8_t *data, uint8_t type, uint16_t crc);
+void SendDataToLabView(uint16_t dataLenght, uint8_t *data, uint8_t type);
+void SendDataToLabViewLRC8(uint16_t dataLenght, uint8_t *data, uint8_t type);
 
 /**
  * @brief Process command from labview
  * @param pkt
  */
 void ProcessLabViewCommand(Packet *pkt);
+
+/**
+ * @brief process type 1 command
+ * 
+ * @param pkt 
+ */
+void ProcessButtonCommand(Packet *pkt);
 
 /**
  * @brief Process SEND command (Type 0x02)
@@ -59,6 +67,6 @@ uint8_t CalculateXOR8(uint8_t *data, size_t length);
 
 /**
  * @brief sends to FPGA
- * 
+ *
  */
 void SendDataToFPGA();
