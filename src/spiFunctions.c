@@ -1,8 +1,6 @@
 #include <avr/io.h>
+#include "spiFunctions.h"
 
-/**
- * @brief initilialise the SPI_master; from "dataOgMega2560"
- */
 void SPI_MasterInit(void)
 {
     // outputs
@@ -13,11 +11,7 @@ void SPI_MasterInit(void)
     // SPR0 er med clk rate at gøre
     SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR0);
 }
-/**
- * @brief sends a 8bit value tothe slave and retu
- * @param out 8bit value to send
- * @return uint8_t 8bit return value 
- */
+
 uint8_t SPI_MasterTransfer(uint8_t out)
 {
     SPDR = out;
@@ -26,9 +20,6 @@ uint8_t SPI_MasterTransfer(uint8_t out)
     return SPDR;
 }
 
-/**
- * @brief initilialise the board as the SPI_Slave; from "dataOgMega2560"
- */
 void SPI_SlaveInit(void)
 {
     /* Set MISO output, all others input */
@@ -36,10 +27,6 @@ void SPI_SlaveInit(void)
     /* Enable SPI */
     SPCR = (1 << SPE);
 }
-
-/**
- * @brief transmit data from slave to master by sending an empty / dummy byte(0x00)
- */
 uint8_t SPI_SlaveReceive(void)
 {
     SPDR = 0X00; // send dummy byte

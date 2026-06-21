@@ -1,11 +1,14 @@
 #include <avr/io.h>
 #include <stdio.h>
 #include "timer.h"
-#include "usart.h"
-#include "functions.h"
+#include "uart.h"
 #include "timer.h"
+#include "adcFunctions.h"
+#include "functions.h"
 #include "spiFunctions.h"
-#define MaxInputLength 512
+
+
+#define MaxInputLength 1024
 
 extern uint8_t generatorSettings[5];
 extern uint16_t oscilloscopeSettings[2];

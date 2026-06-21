@@ -3,21 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include "I2C.h" //include library for i2c driver
-#include <util/delay.h>
 #include "ssd1306.h" //include display driver
 #include <avr/interrupt.h>
-#include "timer.h"
 #include "uart.h"
-#include "functions.h"
 #include "spiFunctions.h"
 #include "adcFunctions.h"
-#include "Labview.h"
+#include "labview.h"
 
 #define BAUD 115200
 #define MY_UBRRD F_CPU / 8 / BAUD - 1  // double speed
 #define MY_UBRRH F_CPU / 16 / BAUD - 1 // half
-
-#define MaxInputLength 1024*2
 
 volatile int receiveFlag = 0, AdcReady = 0;
 volatile char byte = 0;
@@ -31,22 +26,12 @@ uint8_t AdcData2[MaxInputLength];
 
 Packet storedInput = {0};
 
-// marco to define an interrupt based on number input
-#define INIT_INTERRUPT(nr)            \
-    do                                \
-    {                                 \
-        EICR##B |= (1 << ISC##nr##1); \
-        PORT##E |= (1 << PE##nr);     \
-        EIMSK |= (1 << INT##nr);      \
-    } while (0)
-
 int main()
 {
     I2C_Init();          // initialize i2c interface to display
     InitializeDisplay(); // initialize  display
     clear_display();     // use this before writing you own text
 
-    SendStrActualXY("display", 9, 0);
     uart1_Init(MY_UBRRD); // Initialize UART1
     uart0_Init(MY_UBRRD); // Initialize UART0
 
@@ -69,7 +54,7 @@ int main()
         }
         if (AdcReady)
         {
-            SendDataToLabViewLRC8(oscilloscopeSettings[1], AdcData1, 2);
+            SendDataToLabViewLRC8(oscilloscopeSettings[1], AdcData2, 2);
             AdcReady = false;
         }
     }

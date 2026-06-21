@@ -1,0 +1,91 @@
+classDiagram
+    %% Dependencies
+    main.c --> spiFunctions.h-spiFunctions.c
+    main.c --> labview.h-labview.c
+    main.c --> adcFunctions.h-adcFunctions.c
+    main.c --> uart.h-uart.c
+
+    labview.h-labview.c --> timer.h-timer.c
+    labview.h-labview.c --> functions.h-functions.c
+    labview.h-labview.c --> adcFunctions.h-adcFunctions.c
+    labview.h-labview.c --> spiFunctions.h-spiFunctions.c
+    labview.h-labview.c --> uart.h-uart.c
+
+
+
+    class main.c{
+        Selve hoved funktionen der kører og klader alt, den holder også "gang" i programmet med sit uendelige while loop
+        int main() - the main function
+        ISR(TIMER0_COMPA_vect) - interrupt that activates on timer
+        ISR(ADC_vect) - interrupt that activates on the ADC and sets adc_ready to 1
+        ISR(USART1_RX_vect) - Usart receive interrupt for LabVIEW packets
+    }
+
+    class uart.h-uart.c{
+        Funktioner til opsætning og brug af UART, som
+        initalisere uart 0 og 1
+        - læs en byte
+        - send en byte
+        - læs et string
+        - send en string
+
+        void uart0_Init(unsigned int ubrr) - initialize uart0 
+        void uart1_Init(unsigned int ubrr) - initialize uart1
+
+        void putchUSART0(char tx) - transmit one byte through USART0
+        void putchUART1(char tx) - transmit one byte through USART1
+
+        char getchUSART0(void) - receive 1 byte from UART0
+        char getchUART1(void) - receive 1 byte from UART1
+
+        void putstrUSART0(char *ptr) - calls putchUSART0 for each byte in ptr!
+        void putstrUART1(char *ptr) - calls putchUART1 for each byte in ptr!
+
+        char *getStrUSART0(char buffer[], int maxLength) - Receives a string through USART0 until a newline or carriage return
+        char *getStrUART1(char buffer[], int maxLength) - Receives a string through USART1 until a newline or carriage return
+ }
+
+    class timer.h-timer.c{
+        Functioner til at initialisere timer1 og sætte dens frekvens
+
+        InitTimer1(uint16_t freq) - Initializes Timer1
+        SetFreqTimer1(uint16_t freq) - Updates the OCR1A register to change the sampling frequency dynamically.
+    }
+
+    class adcFunctions.h-adcFunctions.c{
+        Funktione til at sætte opsætte ADC
+
+        init_adc() - Initializes ADC unit, sets prescalers, and reference voltage.
+    }
+
+    class functions.h-functions.c{
+        Function to Send text to OLED display but with a XY coordinates
+
+        SendStrActualXY(char *_string, int _x, int _y) - Send string to actualy XY coords not YX
+    }
+
+    class spiFunctions.h-spiFunctions.c{
+        Funktioner for at initialisere, send og modtage via SPI
+
+        SPI_MasterInit() - Initializes necessary pins and sets up the SPI peripheral as Master.
+        uint8_t SPI_MasterTransfer(uint8_t out) - Sends and receives 8 bits via SPI in master mode.
+        SPI_SlaveInit() - initilialise the board as the SPI_Slave
+        uint8_t SPI_SlaveReceive(void) - transmit data from slave to master by sending an empty / dummy byte(0x00)
+    }
+
+    class labview.h-labview.c{
+        Funtioner for kommunikation med labview
+
+        extern uint8_t generatorSettings[5];
+        extern uint16_t oscilloscopeSettings[2];
+
+        void PrintPackageToDisplay(Packet pkt_) - prints the packet info to the OLED
+        void SendDataToLabView(uint16_t dataLenght, uint8_t *data, uint8_t type); - sends data to labview 0x0000 checksum
+        void SendDataToLabViewLRC8(uint16_t dataLenght, uint8_t *data, uint8_t type); - sends data to labview LRC8 checksum
+        void ProcessLabViewCommand(Packet *pkt); - Processes command from LabView input packet.
+        void ProcessButtonCommand(Packet *pkt); - Processes button command (Type 0x01).
+        void ProcessSendCommand(Packet *pkt); - Processes SEND command (Type 0x02)
+        void ProcessStartCommand(Packet *pkt); - Processes START command (Type 0x03).
+        uint8_t CalculateXOR8(uint8_t *data, size_t length) - Calculates XOR8 checksum for the given data block.
+        void SendDataToFPGA(); - Sends necessary data to the FPGA hardware module.
+    }
