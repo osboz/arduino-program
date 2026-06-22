@@ -1,0 +1,68 @@
+---
+  layout: elk
+---
+flowchart LR
+
+start --> setup[Initialize display, i2c, adc, timers, UART]
+
+setup --> loop[[While Loop]] -->loop -----|Inside loop| While
+
+subgraph While
+    direction TB
+
+    startofloop[start of while loop]
+    
+    -->USARTRecieve{did we recive an
+    input from usart?}
+    
+    -->|yes| USARTRecieved[Set relavant
+    motor to position]
+    
+
+
+    -->IsADCReady
+
+    USARTRecieve -->|no|ADCReady{Is ADC ready?}
+    
+    -->|yes| SetADCFalse[set adc ready flag to low]
+    
+    --> print[print arms current location and wanted position to  the display]
+
+    --> operationen[Read a joystick and move the correlating arm to towards the wanted location]
+
+    --> startofloop
+
+    IsADCReady-->|no| skip[skip 1 round of the while loop] --> startofloop
+end
+
+
+    subgraph ProcessLabViewCommand
+    A[Main Loop Entry Point] --> C{what is packet type?};
+
+    C -- 0x01 (BTN) --> D[ProcessButtonCommand Function
+        update settings based on input 
+    ];
+    D --> E(Update Settings);
+    E --> F[Send Data To Lab View LRC8];
+    F --> G[Send Data To FPGA];
+
+    C -- 0x02 (SEND) --> H[ProcessSendCommand];
+    H --> I[SetFreqTimer1];
+    I --> J[SendDataToLabViewLRC8];
+    J --> K[Update Osc Settings];
+
+    C -- 0x03 (START) --> L[ProcessStartCommand 
+    /not implemented/];
+    L --> M[SendDataToLabViewLRC8];
+
+ 
+    end
+
+    subgraph ISR_USART1_RX_vect
+        a[Actiavte on UART1] -->
+        b{is byte 1 0x55?} -- yes-->
+        c{is byte 2 0xAA?} -- yes -->
+        d{is index greater than 4?} -- yes --> 
+        e{is } 
+
+    end

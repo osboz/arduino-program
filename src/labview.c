@@ -114,7 +114,6 @@ void ProcessButtonCommand(Packet *pkt)
 
     SendDataToLabViewLRC8(4, generatorSettings, 1);
     SendDataToFPGA(generatorSettings);
-    SendDataToFPGA(generatorSettings);
 }
 
 void ProcessSendCommand(Packet *pkt)
