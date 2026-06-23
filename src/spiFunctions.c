@@ -27,6 +27,7 @@ void SPI_SlaveInit(void)
     /* Enable SPI */
     SPCR = (1 << SPE);
 }
+
 uint8_t SPI_SlaveReceive(void)
 {
     SPDR = 0X00; // send dummy byte

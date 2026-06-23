@@ -2,8 +2,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-int itsTime;
-
 /**
  * @brief inits timer 1
  * @param _compareValue

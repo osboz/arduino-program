@@ -4,8 +4,8 @@
 #include "uart.h"
 #include "timer.h"
 #include "adcFunctions.h"
-#include "functions.h"
 #include "spiFunctions.h"
+#include "ssd1306.h"
 
 
 #define MaxInputLength 1024
