@@ -16,7 +16,7 @@ year: 2026.06.23
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "I2C.h"     //include library for i2c driver
+#include "I2C.h"     //include library for i2c drivera
 #include "ssd1306.h" //include display driver
 #include <avr/interrupt.h>
 #include "uart.h"
