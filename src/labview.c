@@ -138,7 +138,7 @@ void ProcessSendCommand(Packet *pkt)
 
 void ProcessStartCommand(Packet *pkt)
 {
-    putstrUART0("Bode plot START received\n");
+    // putstrUART0("Bode plot START received\n");
     // Start frequency sweep or trigger action
 
     SendDataToLabViewLRC8(255, pkt->data, 3);
@@ -157,11 +157,15 @@ uint8_t CalculateXOR8(uint8_t *data, size_t length)
 void SendDataToFPGA(uint8_t *data)
 {
     uint8_t checksum = 0x55;
-    SPI_MasterTransfer(0x55);
-    for (size_t i = 1; i < 6; i++)
+
+    spi_select();             // Assert CS (pull low)
+    SPI_MasterTransfer(0x55); // SYNC_BYTE
+
+    for (size_t i = 1; i < 5; i++)
     {
         SPI_MasterTransfer(data[i]);
         checksum ^= data[i];
     }
     SPI_MasterTransfer(checksum);
+    spi_deselect(); // Deassert CS (release high)
 }

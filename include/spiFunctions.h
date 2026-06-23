@@ -22,3 +22,20 @@ void SPI_SlaveInit(void);
  * @brief transmit data from slave to master by sending an empty / dummy byte(0x00)
  */
 uint8_t SPI_SlaveReceive(void);
+
+#define SPI_SS_PIN PB0
+#define SPI_SCK_PIN PB1
+#define SPI_MOSI_PIN PB2
+#define SPI_MISO_PIN PB3
+
+/**
+ * @brief set ss pin low
+ *
+ */
+void spi_select(void);
+
+/**
+ * @brief set ss pin high
+ *
+ */
+void spi_deselect(void);

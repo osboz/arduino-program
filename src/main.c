@@ -72,17 +72,18 @@ ISR(USART1_RX_vect)
     inputBytes[i++] = received;
 
     // State 1: Look for sync bytes (0x55 0xAA)
-    if (inputBytes[0] != 0x55)
-    {
-        i = 0;
-        return;
-    }
-
-    if (inputBytes[1] != 0xAA)
-    {
-        i = 0;
-        return;
-    }
+    if (i == 1)
+        if (inputBytes[0] != 0x55)
+        {
+            i = 0;
+            return;
+        }
+    if (i == 2)
+        if (inputBytes[1] != 0xAA)
+        {
+            i = 0;
+            return;
+        }
 
     if (i < 4)
         return;

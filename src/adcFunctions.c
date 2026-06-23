@@ -13,6 +13,8 @@ void init_adc()
 
     // --- 3. Set Reference Voltage ---
     // Sets the voltage standard used for measurement (e.g., Vcc).
-    ADMUX |= (1 << REFS0);
+    // ADMUX = 0;
+    // ADMUX |= (1 << ADLAR); //
+    // ADMUX |= (1 << REFS0);
     DIDR0 = 0xFF; // turn off the digital i/O
 }

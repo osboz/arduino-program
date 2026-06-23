@@ -9,7 +9,7 @@ void SPI_MasterInit(void)
     // SPE aktiverer SPI generelt
     // MSTR = 1 betyder den er master, 0 betyder slave
     // SPR0 er med clk rate at gøre
-    SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR0);
+    SPCR = (1 << SPE) | (1 << MSTR) | (1 << DORD) | (1 << SPR1);
 }
 
 uint8_t SPI_MasterTransfer(uint8_t out)
@@ -35,4 +35,14 @@ uint8_t SPI_SlaveReceive(void)
         ;
     /* Return Data Register */
     return SPDR;
+}
+
+void spi_select(void)
+{
+    PORTB &= ~(1 << SPI_SS_PIN); // SS low = FPGA selected
+}
+
+void spi_deselect(void)
+{
+    PORTB |= (1 << SPI_SS_PIN); // SS high = packet ended
 }
