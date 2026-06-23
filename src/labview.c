@@ -1,3 +1,35 @@
+/*--------------------------------------------------------
+Purpose: "The purpose of this module is to handle incoming commands from LabVIEW, process them, and send responses back to LabVIEW."
+
+Input: Incoming commands from LabVIEW (packets)
+Output: Responses sent back to LabVIEW (packets)
+
+Author: OKC
+Version: 1
+Date and year: 2026.06.23
+
+Global parameters used:
+* generatorSettings array for storing generator settings
+* oscilloscopeSettings array for storing oscilloscope settings
+
+Functions:
+
+* PrintPackageToDisplay(): prints packet info to OLED display
+* SendDataToLabViewLRC8(): sends data to LabVIEW with LRC-8 checksum
+* ProcessLabViewCommand(): processes incoming commands from LabVIEW
+* ProcessButtonCommand(): processes button commands (Type 0x01)
+* ProcessSendCommand(): processes SEND command (Type 0x02)
+* ProcessStartCommand(): processes START command (Type 0x03)
+* uint8_t CalculateXOR8(uint8_t *data, size_t length);
+* void SendDataToFPGA();
+
+Main:
+The main function is to kommunicate between labview, the MCU and the FPGA/ossiliscope
+
+Interrupt Service Routine:
+None
+--------------------------------------------------------*/
+
 #include "labview.h"
 
 void PrintPackageToDisplay(Packet pkt_)

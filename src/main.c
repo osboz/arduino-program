@@ -1,3 +1,17 @@
+/*-------------------------------------------------------- 
+Main application control logic for system initialization, 
+reading external commands via UART1 (LabVIEW protocol), 
+managing ADC readings via Timer1 interrupts, 
+and controlling peripherals like I2C/Display." 
+
+Input: Commands received over UART1; analog voltage samples from ADC. 
+Output: Display updates via I2C; data transmitted to LabView via UART0. 
+
+Author: OKC 
+Version: 2 Date 
+year: 2026.06.23
+--------------------------------------------------------*/
+
 #include <avr/io.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +21,6 @@
 #include <avr/interrupt.h>
 #include "uart.h"
 #include "spiFunctions.h"
-#include "adcFunctions.h"
 #include "labview.h"
 
 #define BAUD 115200

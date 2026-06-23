@@ -1,4 +1,15 @@
-#include <avr/io.h>
+/*--------------------------------------------------------
+Purpose: "The purpose of this module is to provide low-level functions for serial communication via USART0 and USART1.
+It handles initialization, transmitting single bytes or strings, and receiving characters or delimited strings."
+
+Input: Baud rate for initialization; character data for transmission/reception.
+Output: Transmitted characters on UART0/UART1; received characters into buffers.
+
+Author: OKC
+Version: 1
+Date and year: 2026.06.23
+--------------------------------------------------------*/
+#include "uart.h"
 
 void uart0_Init(unsigned int ubrr)
 {

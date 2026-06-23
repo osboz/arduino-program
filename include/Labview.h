@@ -1,9 +1,28 @@
+/*--------------------------------------------------------
+Purpose: "The purpose of this module is to handle incoming commands from LabVIEW, process them, and send responses back to LabVIEW."
+
+Input: Incoming commands from LabVIEW (packets)
+Output: Responses sent back to LabVIEW (packets)
+
+Author: OKC
+Version: 1
+Date and year: 2026.06.23
+
+Global parameters used:
+* generatorSettings array for storing generator settings
+* oscilloscopeSettings array for storing oscilloscope settings
+
+The main function is to kommunicate between labview, the MCU and the FPGA/ossiliscope
+
+Interrupt Service Routine:
+None
+--------------------------------------------------------*/
+
 #include <avr/io.h>
 #include <stdio.h>
 #include "timer.h"
 #include "uart.h"
 #include "timer.h"
-#include "adcFunctions.h"
 #include "spiFunctions.h"
 #include "ssd1306.h"
 
@@ -70,6 +89,5 @@ uint8_t CalculateXOR8(uint8_t *data, size_t length);
 
 /**
  * @brief sends to FPGA
- *
  */
 void SendDataToFPGA();
