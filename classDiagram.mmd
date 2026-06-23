@@ -2,12 +2,9 @@ classDiagram
     %% Dependencies
     main.c --> spiFunctions.h-spiFunctions.c
     main.c --> labview.h-labview.c
-    main.c --> adcFunctions.h-adcFunctions.c
     main.c --> uart.h-uart.c
 
     labview.h-labview.c --> timer.h-timer.c
-    labview.h-labview.c --> functions.h-functions.c
-    labview.h-labview.c --> adcFunctions.h-adcFunctions.c
     labview.h-labview.c --> spiFunctions.h-spiFunctions.c
     labview.h-labview.c --> uart.h-uart.c
 
@@ -15,6 +12,7 @@ classDiagram
 
     class main.c{
         Selve hoved funktionen der kører og klader alt, den holder også "gang" i programmet med sit uendelige while loop
+        void init_adc() - init the ADC
         int main() - the main function
         ISR(TIMER0_COMPA_vect) - interrupt that activates on timer
         ISR(ADC_vect) - interrupt that activates on the ADC and sets adc_ready to 1
@@ -50,18 +48,6 @@ classDiagram
 
         InitTimer1(uint16_t freq) - Initializes Timer1
         SetFreqTimer1(uint16_t freq) - Updates the OCR1A register to change the sampling frequency dynamically.
-    }
-
-    class adcFunctions.h-adcFunctions.c{
-        Funktione til at sætte opsætte ADC
-
-        init_adc() - Initializes ADC unit, sets prescalers, and reference voltage.
-    }
-
-    class functions.h-functions.c{
-        Function to Send text to OLED display but with a XY coordinates
-
-        SendStrActualXY(char *_string, int _x, int _y) - Send string to actualy XY coords not YX
     }
 
     class spiFunctions.h-spiFunctions.c{

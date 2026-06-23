@@ -4,17 +4,17 @@ void PrintPackageToDisplay(Packet pkt_)
 {
     char buffer[64];
     putstrUART0("Packet received:\n");
-    SendStrActualXY("Packet received", 0, 0);
+    sendStrXY("Packet received", 0, 0);
 
     // Print packet length
     sprintf(buffer, "PkLen: %d\n", pkt_.packetLength);
     putstrUART0(buffer);
-    SendStrActualXY(buffer, 0, 1);
+    sendStrXY(buffer, 1, 0);
 
     // Print type
     sprintf(buffer, "Type: %d\n", pkt_.type);
     putstrUART0(buffer);
-    SendStrActualXY(buffer, 0, 2);
+    sendStrXY(buffer, 2, 0);
 
     // Print data as hex (not as raw binary)
     putstrUART0("Data (hex): ");
@@ -22,14 +22,14 @@ void PrintPackageToDisplay(Packet pkt_)
     {
         sprintf(buffer, "%02X ", pkt_.data[k]);
         putstrUART0(buffer);
-        SendStrActualXY(buffer, 2 * k + 1, 3);
+        sendStrXY(buffer, 3, 2 * k + 1);
     }
     putchUART0('\n');
 
     // Print CRC
     sprintf(buffer, "CRC: %04X\n", pkt_.crc);
     putstrUART0(buffer);
-    SendStrActualXY(buffer, 0, 4);
+    sendStrXY(buffer, 4, 0);
 }
 
 void SendDataToLabViewLRC8(uint16_t dataLength, uint8_t *data, uint8_t type)
